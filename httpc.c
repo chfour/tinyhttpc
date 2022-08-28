@@ -29,6 +29,11 @@ int main(int argc, char** argv)
         return 1;
     }
 
+    char writebuf[5] = "hi!\n";
+    if (write(sockfd, writebuf, sizeof(writebuf)-1) < 0) {
+        printf("write() error: (%d) %s\n", errno, strerror(errno));
+        return 1;
+    }
 
     char recvbuf[1024];
     memset(recvbuf, '0', sizeof(recvbuf));
