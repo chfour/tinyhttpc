@@ -27,23 +27,38 @@ int main(int argc, char** argv)
     }
 
     char addrstr[INET6_ADDRSTRLEN];
-    if (result->ai_addr->sa_family == AF_INET) {
-        struct sockaddr_in *p = (struct sockaddr_in *)result->ai_addr;
-        inet_ntop(AF_INET, &p->sin_addr, addrstr, sizeof(addrstr));
-    } else if (result->ai_addr->sa_family == AF_INET6) {
-        struct sockaddr_in6 *p = (struct sockaddr_in6 *)result->ai_addr;
-        inet_ntop(AF_INET6, &p->sin6_addr, addrstr, sizeof(addrstr));
-    }
-    fprintf(stderr, "%s -> %s\n", argv[1], addrstr);
-
+    struct addrinfo *cresult;
     int sockfd;
-    if ((sockfd = socket(result->ai_addr->sa_family, SOCK_STREAM, 0)) < 0) {
-        fprintf(stderr, "socket() failed: (%d) %s\n", errno, strerror(errno));
-        return 1;
+    for (cresult = result; cresult != NULL; cresult = cresult->ai_next) {
+        if (result->ai_addr->sa_family == AF_INET) {
+            struct sockaddr_in *p = (struct sockaddr_in *)result->ai_addr;
+            inet_ntop(AF_INET, &p->sin_addr, addrstr, sizeof(addrstr));
+        } else if (result->ai_addr->sa_family == AF_INET6) {
+            struct sockaddr_in6 *p = (struct sockaddr_in6 *)result->ai_addr;
+            inet_ntop(AF_INET6, &p->sin6_addr, addrstr, sizeof(addrstr));
+        }
+        fprintf(stderr, "trying '%s'...\n", addrstr);
+        if ((sockfd = socket(result->ai_addr->sa_family, SOCK_STREAM, 0)) < 0) {
+            fprintf(stderr, "socket() failed: (%d) %s\n", errno, strerror(errno));
+            if (close(sockfd) < 0)
+                fprintf(stderr, "close() error: (%d) %s\n", errno, strerror(errno));
+            sockfd = -1;
+            continue;
+        }
+
+        if (connect(sockfd, result->ai_addr, result->ai_addrlen) < 0) {
+            fprintf(stderr, "connect() failed: (%d) %s\n", errno, strerror(errno));
+            if (close(sockfd) < 0)
+                fprintf(stderr, "close() error: (%d) %s\n", errno, strerror(errno));
+            sockfd = -1;
+            continue;
+        }
+        fprintf(stderr, "connected!\n");
+        break;
     }
 
-    if (connect(sockfd, result->ai_addr, result->ai_addrlen) < 0) {
-        fprintf(stderr, "connect() failed: (%d) %s\n", errno, strerror(errno));
+    if (sockfd == -1) {
+        fprintf(stderr, "connecting failed\n");
         return 1;
     }
 
