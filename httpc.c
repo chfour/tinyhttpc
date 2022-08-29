@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <arpa/inet.h>
+#include <netdb.h>
 
 int main(int argc, char** argv)
 {
@@ -13,18 +14,35 @@ int main(int argc, char** argv)
         return 1;
     }
 
+    struct addrinfo hints;
+    struct addrinfo *result;
+    memset(&hints, 0, sizeof(struct addrinfo));
+    hints.ai_family = AF_UNSPEC; // allow ipv4 or v6
+    hints.ai_socktype = SOCK_STREAM;
+
+    int gaires;
+    if ((gaires = getaddrinfo(argv[1], argv[2], &hints, &result)) != 0) {
+        printf("getaddrinfo() failed: (%d) %s\n", gaires, gai_strerror(gaires));
+        exit(1);
+    }
+
+    char addrstr[INET6_ADDRSTRLEN];
+    if (result->ai_addr->sa_family == AF_INET) {
+        struct sockaddr_in *p = (struct sockaddr_in *)result->ai_addr;
+        inet_ntop(AF_INET, &p->sin_addr, addrstr, sizeof(addrstr));
+    } else if (result->ai_addr->sa_family == AF_INET6) {
+        struct sockaddr_in6 *p = (struct sockaddr_in6 *)result->ai_addr;
+        inet_ntop(AF_INET6, &p->sin6_addr, addrstr, sizeof(addrstr));
+    }
+    printf("%s -> %s\n", argv[1], addrstr);
+
     int sockfd;
-    if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+    if ((sockfd = socket(result->ai_addr->sa_family, SOCK_STREAM, 0)) < 0) {
         printf("socket() failed: (%d) %s\n", errno, strerror(errno));
         return 1;
     }
 
-    struct sockaddr_in servaddr;
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_addr.s_addr = inet_addr(argv[1]);
-    servaddr.sin_port = htons(atol(argv[2]));
-
-    if (connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0) {
+    if (connect(sockfd, result->ai_addr, result->ai_addrlen) < 0) {
         printf("connect() failed: (%d) %s\n", errno, strerror(errno));
         return 1;
     }
