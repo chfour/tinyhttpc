@@ -10,7 +10,7 @@
 int main(int argc, char** argv)
 {
     if (argc < 3) {
-        printf("%s addr port\n", argv[0]);
+        fprintf(stderr, "%s addr port\n", argv[0]);
         return 1;
     }
 
@@ -22,7 +22,7 @@ int main(int argc, char** argv)
 
     int gaires;
     if ((gaires = getaddrinfo(argv[1], argv[2], &hints, &result)) != 0) {
-        printf("getaddrinfo() failed: (%d) %s\n", gaires, gai_strerror(gaires));
+        fprintf(stderr, "getaddrinfo() failed: (%d) %s\n", gaires, gai_strerror(gaires));
         exit(1);
     }
 
@@ -34,22 +34,22 @@ int main(int argc, char** argv)
         struct sockaddr_in6 *p = (struct sockaddr_in6 *)result->ai_addr;
         inet_ntop(AF_INET6, &p->sin6_addr, addrstr, sizeof(addrstr));
     }
-    printf("%s -> %s\n", argv[1], addrstr);
+    fprintf(stderr, "%s -> %s\n", argv[1], addrstr);
 
     int sockfd;
     if ((sockfd = socket(result->ai_addr->sa_family, SOCK_STREAM, 0)) < 0) {
-        printf("socket() failed: (%d) %s\n", errno, strerror(errno));
+        fprintf(stderr, "socket() failed: (%d) %s\n", errno, strerror(errno));
         return 1;
     }
 
     if (connect(sockfd, result->ai_addr, result->ai_addrlen) < 0) {
-        printf("connect() failed: (%d) %s\n", errno, strerror(errno));
+        fprintf(stderr, "connect() failed: (%d) %s\n", errno, strerror(errno));
         return 1;
     }
 
     char writebuf[5] = "hi!\n";
     if (write(sockfd, writebuf, sizeof(writebuf)-1) < 0) {
-        printf("write() error: (%d) %s\n", errno, strerror(errno));
+        fprintf(stderr, "write() error: (%d) %s\n", errno, strerror(errno));
         return 1;
     }
 
@@ -59,16 +59,16 @@ int main(int argc, char** argv)
     while ((n = read(sockfd, recvbuf, sizeof(recvbuf)-1)) > 0) {
         recvbuf[n] = 0;
         if (fputs(recvbuf, stdout) == EOF) {
-            printf("fputs() error\n");
+            fprintf(stderr, "fputs() error\n");
         }
     }
 
     if (n < 0) {
-        printf("\nread() error: (%d) %s\n", errno, strerror(errno));
+        fprintf(stderr, "\nread() error: (%d) %s\n", errno, strerror(errno));
     }
 
     if (close(sockfd) < 0) {
-        printf("\nclose() error: (%d) %s\n", errno, strerror(errno));
+        fprintf(stderr, "\nclose() error: (%d) %s\n", errno, strerror(errno));
         return 1;
     }
 
