@@ -9,10 +9,24 @@
 
 int main(int argc, char** argv)
 {
-    if (argc < 3) {
-        fprintf(stderr, "%s addr port\n", argv[0]);
+    if (argc < 2) {
+        fprintf(stderr, "%s addr:[port]\n", argv[0]);
         return 1;
     }
+
+    char host[NI_MAXHOST];
+    strcpy(host, argv[1]);
+    char port[NI_MAXSERV];
+    memset(port, 0, sizeof(port));
+    for (int i = 0; i < strlen(argv[1]); i++) {
+        if (argv[1][i] == ':') {
+            memcpy(host, argv[1], i); host[i] = 0;
+            memcpy(port, argv[1]+i+1, strlen(argv[1]));
+            break;
+        }
+    }
+    if (strlen(port) == 0) memcpy(port, "80", 2);
+    printf("host='%s' port='%s'\n", host, port);
 
     struct addrinfo hints;
     struct addrinfo *result;
@@ -21,7 +35,7 @@ int main(int argc, char** argv)
     hints.ai_socktype = SOCK_STREAM;
 
     int gaires;
-    if ((gaires = getaddrinfo(argv[1], argv[2], &hints, &result)) != 0) {
+    if ((gaires = getaddrinfo(host, port, &hints, &result)) != 0) {
         fprintf(stderr, "getaddrinfo() failed: (%d) %s\n", gaires, gai_strerror(gaires));
         exit(1);
     }
