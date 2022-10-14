@@ -71,18 +71,22 @@ int main(int argc, char** argv)
     memset(port, 0, sizeof(port));
     for (int i = 0; i < strlen(argv[1]); i++) {
         if (argv[1][i] == ':' && (argv[1][0] != '[' || argv[1][i-1] == ']')) {
+            if (i+1 >= strlen(argv[1])) {
+                fprintf(stderr, "error: invalid URI: expected port after ':'\n%s\n%*s^here\n", argv[1], i+1, "");
+                exit(1);
+            }
+
             if (argv[1][0] == '[') {
                 memcpy(host, argv[1]+1, i-1); host[i-2] = 0;
             } else {
                 memcpy(host, argv[1], i); host[i] = 0;
             }
-
             memcpy(port, argv[1]+i+1, strlen(argv[1]));
             break;
         }
     }
     if (strlen(port) == 0) memcpy(port, "80", 2);
-    printf("host='%s' port='%s'\n", host, port);
+    fprintf(stderr, "parsed host='%s' port='%s'\n", host, port);
 
     int sockfd = remote_connect(host, port, AF_UNSPEC);
 
