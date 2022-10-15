@@ -61,32 +61,51 @@ int remote_connect(char* host, char* port, int family)
 int main(int argc, char** argv)
 {
     if (argc < 2) {
-        fprintf(stderr, "%s addr:[port]\n", argv[0]);
+        fprintf(stderr, "%s addr[:port][/path]\n", argv[0]);
         return 1;
     }
 
     char host[NI_MAXHOST];
-    strcpy(host, argv[1]);
+    memset(host, 0, sizeof(host));
+
+    char path[NI_MAXHOST];
+    memset(path, 0, sizeof(path));
+
     char port[NI_MAXSERV];
     memset(port, 0, sizeof(port));
+
     for (int i = 0; i < strlen(argv[1]); i++) {
         if (argv[1][i] == ':' && (argv[1][0] != '[' || argv[1][i-1] == ']')) {
-            if (i+1 >= strlen(argv[1])) {
+            unsigned int j;
+            char* j_ = strchr(argv[1]+i, '/');
+            if (j_ == NULL) j = strlen(argv[1]);
+            else j = j_ - argv[1];
+            //fprintf(stderr, "i=%i j=%i len=%i\n", i, j, strlen(argv[1]));
+
+            if (i+1 >= j) {
                 fprintf(stderr, "error: invalid URI: expected port after ':'\n%s\n%*s^here\n", argv[1], i+1, "");
                 exit(1);
             }
+
+            if (strlen(host) > 0) continue;
 
             if (argv[1][0] == '[') {
                 memcpy(host, argv[1]+1, i-1); host[i-2] = 0;
             } else {
                 memcpy(host, argv[1], i); host[i] = 0;
             }
-            memcpy(port, argv[1]+i+1, strlen(argv[1]));
-            break;
+            memcpy(port, argv[1]+i+1, j-i-1);
+        } else if (argv[1][i] == '/') {
+            if (strlen(path) > 0) continue;
+
+            if (strlen(host) == 0) memcpy(host, argv[1], i);
+            strcpy(path, argv[1]+i);
         }
     }
+    if (strlen(host) == 0) strcpy(host, argv[1]);
     if (strlen(port) == 0) memcpy(port, "80", 2);
-    fprintf(stderr, "parsed host='%s' port='%s'\n", host, port);
+    if (strlen(path) == 0) path[0] = '/';
+    fprintf(stderr, "parsed host='%s' port='%s' path='%s'\n", host, port, path);
 
     int sockfd = remote_connect(host, port, AF_UNSPEC);
 
