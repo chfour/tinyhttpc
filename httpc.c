@@ -7,6 +7,8 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 
+#define LINE_MAXLEN NI_MAXHOST + 32
+
 int remote_connect(char* host, char* port, int family)
 {
     struct addrinfo hints;
@@ -56,6 +58,26 @@ int remote_connect(char* host, char* port, int family)
         break;
     }
     return sockfd;
+}
+
+ssize_t write_helper(int fd, const void* buf, size_t count) {
+    ssize_t retval;
+    if ((retval = write(fd, buf, count)) < 0) {
+        fprintf(stderr, "error: in write_helper(): write(sock) error: (%d) %s\n", errno, strerror(errno));
+        exit(1);
+    }
+
+    char* tmpbuf = (char*)malloc(count+2+1);
+    memset(tmpbuf, 0, sizeof(tmpbuf));
+    memcpy(tmpbuf, "> ", 2);
+    memcpy(tmpbuf+2, buf, count);
+
+    if (fputs(tmpbuf, stderr) == EOF) {
+        fprintf(stderr, "error: in write_helper(): fputs() error\n");
+    }
+
+    free(tmpbuf);
+    return retval;
 }
 
 int main(int argc, char** argv)
@@ -114,11 +136,10 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    char writebuf[5] = "hi!\n";
-    if (write(sockfd, writebuf, sizeof(writebuf)-1) < 0) {
-        fprintf(stderr, "write() error: (%d) %s\n", errno, strerror(errno));
-        return 1;
-    }
+    char writebuf[LINE_MAXLEN];
+    memset(writebuf, 0, sizeof(writebuf));
+    memcpy(writebuf, "hi!\n", 4);
+    write_helper(sockfd, writebuf, strlen(writebuf));
 
     char recvbuf[1024];
     memset(recvbuf, '0', sizeof(recvbuf));
