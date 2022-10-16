@@ -7,7 +7,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 
-#define LINE_MAXLEN NI_MAXHOST + 32
+#define LINE_MAXLEN 8192
 
 int remote_connect(char* host, char* port, int family)
 {
@@ -68,7 +68,7 @@ ssize_t write_helper(int fd, const void* buf, size_t count) {
     }
 
     char* tmpbuf = (char*)malloc(count+2+1);
-    memset(tmpbuf, 0, sizeof(tmpbuf));
+    memset(tmpbuf, 0, sizeof(&tmpbuf));
     memcpy(tmpbuf, "> ", 2);
     memcpy(tmpbuf+2, buf, count);
 
@@ -141,22 +141,42 @@ int main(int argc, char** argv)
     memcpy(writebuf, "hi!\n", 4);
     write_helper(sockfd, writebuf, strlen(writebuf));
 
-    char recvbuf[1024];
-    memset(recvbuf, '0', sizeof(recvbuf));
-    int n = 0;
-    while ((n = read(sockfd, recvbuf, sizeof(recvbuf)-1)) > 0) {
-        recvbuf[n] = 0;
-        if (fputs(recvbuf, stdout) == EOF) {
-            fprintf(stderr, "fputs() error\n");
+    char recvline[LINE_MAXLEN];
+    memset(recvline, 0, sizeof(recvline));
+    char recv, last = 0;
+    unsigned int linepos = 0;
+    ssize_t nread;
+    while ((nread = read(sockfd, &recv, 1)) > 0) {
+        if (recv == 0) continue;
+        else if (recv == '\r') {}
+        else if (recv == '\n') {
+            if (last == '\r') {
+                last = recv;
+                continue;
+            }
+        } else {
+            recvline[linepos++] = recv;
+            last = recv;
+            continue;
         }
+        last = recv;
+
+        // BEGIN handle line
+        fputs("< ", stderr);
+        for (int i = 0; i < strlen(recvline); i++)
+            fputc(recvline[i] <= '~' && recvline[i] >= ' ' ? recvline[i] : '.', stderr);
+        fputc('\n', stderr);
+        // END handle line
+
+        memset(recvline, 0, sizeof(recvline));
+        linepos = 0;
     }
 
-    if (n < 0) {
-        fprintf(stderr, "\nread() error: (%d) %s\n", errno, strerror(errno));
-    }
+    if (nread < 0)
+        fprintf(stderr, "read() error: (%d) %s\n", errno, strerror(errno));
 
     if (close(sockfd) < 0) {
-        fprintf(stderr, "\nclose() error: (%d) %s\n", errno, strerror(errno));
+        fprintf(stderr, "close() error: (%d) %s\n", errno, strerror(errno));
         return 1;
     }
 
