@@ -68,10 +68,10 @@ ssize_t write_helper(int fd, const void* buf, size_t count) {
         exit(1);
     }
 
-    char* tmpbuf = (char*)malloc(count+2+1);
-    memset(tmpbuf, 0, sizeof(&tmpbuf));
-    memcpy(tmpbuf, "> ", 2);
+    char* tmpbuf = malloc(count+2);
+    strcpy(tmpbuf, "> ");
     memcpy(tmpbuf+2, buf, count);
+    tmpbuf[2+count] = 0;
 
     if (fputs(tmpbuf, stderr) == EOF) {
         fprintf(stderr, "error: in write_helper(): fputs() error\n");
@@ -139,8 +139,20 @@ int main(int argc, char** argv)
 
     char writebuf[LINE_MAXLEN];
     memset(writebuf, 0, sizeof(writebuf));
-    memcpy(writebuf, "hi!\n", 4);
+    sprintf(writebuf, "GET %s HTTP/1.1\r\n", path);
     write_helper(sockfd, writebuf, strlen(writebuf));
+
+    memset(writebuf, 0, sizeof(writebuf));
+    if (strcmp(port, "80") == 0)
+        sprintf(writebuf, "Host: %s\r\n", host);
+    else
+        sprintf(writebuf, "Host: %s:%s\r\n", host, port);
+    write_helper(sockfd, writebuf, strlen(writebuf));
+
+    strcpy(writebuf, "Accept: */*\r\n");
+    write_helper(sockfd, writebuf, strlen(writebuf));
+
+    write_helper(sockfd, "\r\n", 2);
 
     unsigned int recvline_s = 0;
     char* recvline = NULL;
@@ -148,6 +160,7 @@ int main(int argc, char** argv)
     unsigned int linepos = 0;
     ssize_t nread;
     while ((nread = read(sockfd, &recv, 1)) > 0) {
+        fprintf(stderr, "read() -> '%c'\n", recv);
         if (recv == 0) continue;
         else if (recv == '\r') {}
         else if (recv == '\n') {
