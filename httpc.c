@@ -8,6 +8,7 @@
 #include <netdb.h>
 
 #define LINE_MAXLEN 8192
+#define RECVBUF_REALLOC_CHUNK 256
 
 int remote_connect(char* host, char* port, int family)
 {
@@ -141,8 +142,8 @@ int main(int argc, char** argv)
     memcpy(writebuf, "hi!\n", 4);
     write_helper(sockfd, writebuf, strlen(writebuf));
 
-    char recvline[LINE_MAXLEN];
-    memset(recvline, 0, sizeof(recvline));
+    unsigned int recvline_s = 0;
+    char* recvline = NULL;
     char recv, last = 0;
     unsigned int linepos = 0;
     ssize_t nread;
@@ -155,6 +156,12 @@ int main(int argc, char** argv)
                 continue;
             }
         } else {
+            if (recvline_s == 0 || linepos > recvline_s - 1) {
+                //fprintf(stderr, "realloc to %i (+%i)\n", recvline_s + RECVBUF_REALLOC_CHUNK, RECVBUF_REALLOC_CHUNK);
+                recvline = realloc(recvline, recvline_s + RECVBUF_REALLOC_CHUNK);
+                recvline_s += RECVBUF_REALLOC_CHUNK;
+                memset(recvline+recvline_s-RECVBUF_REALLOC_CHUNK, 0, RECVBUF_REALLOC_CHUNK);
+            }
             recvline[linepos++] = recv;
             last = recv;
             continue;
@@ -168,7 +175,7 @@ int main(int argc, char** argv)
         fputc('\n', stderr);
         // END handle line
 
-        memset(recvline, 0, sizeof(recvline));
+        free(recvline); recvline = NULL; recvline_s = 0;
         linepos = 0;
     }
 
