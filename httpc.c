@@ -152,6 +152,7 @@ int main(int argc, char** argv)
     strcpy(writebuf, "Accept: */*\r\n");
     write_helper(sockfd, writebuf, strlen(writebuf));
 
+    fprintf(stderr, ">\n> [end of request headers]\n");
     write_helper(sockfd, "\r\n", 2);
 
     unsigned int recvline_s = 0;
@@ -185,14 +186,26 @@ int main(int argc, char** argv)
         for (int i = 0; i < strlen(recvline); i++)
             fputc(recvline[i] <= '~' && recvline[i] >= ' ' ? recvline[i] : '.', stderr);
         fputc('\n', stderr);
+        if (strlen(recvline) == 0) {
+            fprintf(stderr, "< [end of response headers]");
+            break;
+        }
         // END handle line
 
         free(recvline); recvline = NULL; recvline_s = 0;
         linepos = 0;
     }
-
     if (nread < 0)
-        fprintf(stderr, "read() error: (%d) %s\n", errno, strerror(errno));
+        fprintf(stderr, "while reading headers: read() error: (%d) %s\n", errno, strerror(errno));
+
+    char recvbuf[1024];
+    while ((nread = read(sockfd, recvbuf, sizeof(recvbuf))) > 0) {
+        if(fwrite(recvbuf, 1, nread, stdout) != nread)
+            fprintf(stderr, "fwrite(..., stdout) error\n");
+    }
+    if (nread < 0)
+        fprintf(stderr, "while reading body: read() error: (%d) %s\n", errno, strerror(errno));
+
 
     if (close(sockfd) < 0) {
         fprintf(stderr, "close() error: (%d) %s\n", errno, strerror(errno));
