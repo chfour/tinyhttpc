@@ -160,7 +160,12 @@ int main(int argc, char** argv)
     unsigned int linepos = 0;
     ssize_t nread;
     while ((nread = read(sockfd, &recv, 1)) > 0) {
-        fprintf(stderr, "read() -> '%c'\n", recv);
+        if (recvline_s == 0 || linepos > recvline_s - 1) {
+            //fprintf(stderr, "realloc to %i (+%i)\n", recvline_s + RECVBUF_REALLOC_CHUNK, RECVBUF_REALLOC_CHUNK);
+            recvline = realloc(recvline, recvline_s + RECVBUF_REALLOC_CHUNK);
+            recvline_s += RECVBUF_REALLOC_CHUNK;
+            memset(recvline+recvline_s-RECVBUF_REALLOC_CHUNK, 0, RECVBUF_REALLOC_CHUNK);
+        }
         if (recv == 0) continue;
         else if (recv == '\r') {}
         else if (recv == '\n') {
@@ -169,12 +174,6 @@ int main(int argc, char** argv)
                 continue;
             }
         } else {
-            if (recvline_s == 0 || linepos > recvline_s - 1) {
-                //fprintf(stderr, "realloc to %i (+%i)\n", recvline_s + RECVBUF_REALLOC_CHUNK, RECVBUF_REALLOC_CHUNK);
-                recvline = realloc(recvline, recvline_s + RECVBUF_REALLOC_CHUNK);
-                recvline_s += RECVBUF_REALLOC_CHUNK;
-                memset(recvline+recvline_s-RECVBUF_REALLOC_CHUNK, 0, RECVBUF_REALLOC_CHUNK);
-            }
             recvline[linepos++] = recv;
             last = recv;
             continue;
