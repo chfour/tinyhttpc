@@ -152,14 +152,15 @@ int main(int argc, char** argv)
     strcpy(writebuf, "Accept: */*\r\n");
     write_helper(sockfd, writebuf, strlen(writebuf));
 
-    fprintf(stderr, ">\n> [end of request headers]\n");
     write_helper(sockfd, "\r\n", 2);
+    fprintf(stderr, "> [end of request headers]\n");
 
     unsigned int recvline_s = 0;
     char* recvline = NULL;
     char recv, last = 0;
     unsigned int linepos = 0;
     ssize_t nread;
+    char shouldend = 0;
     while ((nread = read(sockfd, &recv, 1)) > 0) {
         if (recvline_s == 0 || linepos > recvline_s - 1) {
             //fprintf(stderr, "realloc to %i (+%i)\n", recvline_s + RECVBUF_REALLOC_CHUNK, RECVBUF_REALLOC_CHUNK);
@@ -167,6 +168,12 @@ int main(int argc, char** argv)
             recvline_s += RECVBUF_REALLOC_CHUNK;
             memset(recvline+recvline_s-RECVBUF_REALLOC_CHUNK, 0, RECVBUF_REALLOC_CHUNK);
         }
+
+        if (shouldend) {
+            if (recv == '\n') recv = 0;
+            break;
+        }
+
         if (recv == 0) continue;
         else if (recv == '\r') {}
         else if (recv == '\n') {
@@ -187,8 +194,9 @@ int main(int argc, char** argv)
             fputc(recvline[i] <= '~' && recvline[i] >= ' ' ? recvline[i] : '.', stderr);
         fputc('\n', stderr);
         if (strlen(recvline) == 0) {
-            fprintf(stderr, "< [end of response headers]");
-            break;
+            fprintf(stderr, "< [end of response headers]\n");
+            shouldend = 1;
+            continue;
         }
         // END handle line
 
@@ -198,6 +206,7 @@ int main(int argc, char** argv)
     if (nread < 0)
         fprintf(stderr, "while reading headers: read() error: (%d) %s\n", errno, strerror(errno));
 
+    if (recv != 0) fputc(recv, stdout);
     char recvbuf[1024];
     while ((nread = read(sockfd, recvbuf, sizeof(recvbuf))) > 0) {
         if(fwrite(recvbuf, 1, nread, stdout) != nread)
