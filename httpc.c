@@ -152,6 +152,9 @@ int main(int argc, char** argv)
     strcpy(writebuf, "Accept: */*\r\n");
     write_helper(sockfd, writebuf, strlen(writebuf));
 
+    strcpy(writebuf, "Connection: close\r\n");
+    write_helper(sockfd, writebuf, strlen(writebuf));
+
     write_helper(sockfd, "\r\n", 2);
     fprintf(stderr, "> [end of request headers]\n");
 
