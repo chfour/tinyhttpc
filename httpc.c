@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <ctype.h>
+#include <limits.h>
 #include <unistd.h>
 #include <errno.h>
 #include <arpa/inet.h>
@@ -158,6 +160,8 @@ int main(int argc, char** argv)
     write_helper(sockfd, "\r\n", 2);
     fprintf(stderr, "> [end of request headers]\n");
 
+    unsigned long long hdr_content_length = ULLONG_MAX;
+
     unsigned int recvline_s = 0;
     char* recvline = NULL;
     char recv, last = 0;
@@ -201,6 +205,23 @@ int main(int argc, char** argv)
             shouldend = 1;
             continue;
         }
+
+        char* colon_ptr = strchr(recvline, ':');
+        if (colon_ptr != NULL) {
+            unsigned int colon_i = colon_ptr - recvline;
+            for (unsigned int i = 0; i < colon_i; i++) recvline[i] = tolower(recvline[i]);
+        }
+
+        if (strncmp(recvline, "content-length: ", strlen("content-length: ")) == 0) {
+            char* last_non_num;
+            hdr_content_length = strtoull(recvline+strlen("content-length: "), &last_non_num, 10);
+            if (last_non_num != recvline+strlen(recvline)) {
+                fprintf(stderr, "* got invalid Content-Length\n");
+                hdr_content_length = ULLONG_MAX;
+            } else {
+                fprintf(stderr, "* got Content-Length=%llu\n", hdr_content_length);
+            }
+        }
         // END handle line
 
         free(recvline); recvline = NULL; recvline_s = 0;
@@ -210,10 +231,16 @@ int main(int argc, char** argv)
         fprintf(stderr, "while reading headers: read() error: (%d) %s\n", errno, strerror(errno));
 
     if (recv != 0) fputc(recv, stdout);
+    unsigned long long nread_tot = 0;
     char recvbuf[1024];
     while ((nread = read(sockfd, recvbuf, sizeof(recvbuf))) > 0) {
         if(fwrite(recvbuf, 1, nread, stdout) != nread)
             fprintf(stderr, "fwrite(..., stdout) error\n");
+        nread_tot += nread;
+        if (nread_tot != ULLONG_MAX && nread_tot >= hdr_content_length) {
+            fprintf(stderr, "* closing because of Content-Length\n");
+            break;
+        }
     }
     if (nread < 0)
         fprintf(stderr, "while reading body: read() error: (%d) %s\n", errno, strerror(errno));
